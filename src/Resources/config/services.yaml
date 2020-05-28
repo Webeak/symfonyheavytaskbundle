@@ -1,0 +1,68 @@
+
+services:
+    #
+    # Defines controllers as services and set autowire and autoconfigure because they are at false by default.
+    #
+    Webeak\Bundle\HeavyTaskBundle\Controller\:
+        autowire: true
+        autoconfigure: true
+        resource: '../../Controller'
+        tags: ['controller.service_arguments']
+
+    Webeak\Bundle\HeavyTaskBundle\AbstractHeavyTask:
+        abstract: true
+        arguments:
+            - '@Webeak\Bundle\SharedStorageBundle\SharedStorageInterface'
+            - '@Webeak\Bundle\DebugBundle\Logger'
+
+    Webeak\Bundle\HeavyTaskBundle\HeavyTaskManager:
+        arguments:
+            - '@service_container'
+            - '@session'
+            - '@Webeak\Bundle\SharedStorageBundle\SharedStorageInterface'
+            - '@Webeak\Bundle\DebugBundle\Logger'
+            - '@Webeak\Bundle\HeavyTaskBundle\SupervisorBridge'
+
+    Webeak\Bundle\HeavyTaskBundle\Supervisor:
+        arguments:
+            - '@Webeak\Bundle\SharedStorageBundle\SharedStorageInterface'
+            - '@Webeak\Bundle\DebugBundle\Logger'
+            - '@Webeak\Bundle\HeavyTaskBundle\SupervisorBridge'
+            - '%wb.heavy_task.supervisor.max_parallel_processes%'
+            - '%wb.heavy_task.supervisor.history_size%'
+            - '%wb.heavy_task.supervisor.max_consecutive_crashes%'
+            - '%wb.heavy_task.supervisor.tick_interval%'
+            - '%kernel.project_dir%'
+
+    Webeak\Bundle\HeavyTaskBundle\SupervisorBridge:
+        arguments:
+            - '@Webeak\Bundle\SharedStorageBundle\SharedStorageInterface'
+            - '@Webeak\Bundle\DebugBundle\Logger'
+
+    Webeak\Bundle\HeavyTaskBundle\HeavyTaskRunner:
+        arguments:
+            - '@service_container'
+            - '@Webeak\Bundle\SharedStorageBundle\SharedStorageInterface'
+            - '@Webeak\Bundle\DebugBundle\Logger'
+
+    #
+    # Commands
+    #
+    Webeak\Bundle\HeavyTaskBundle\Command\StartSupervisorCommand:
+        arguments:
+            - '@Webeak\Bundle\HeavyTaskBundle\Supervisor'
+            - '@Webeak\Bundle\DebugBundle\Logger'
+        tags:
+            - { name: 'console.command', command: 'wb:heavy-task:start-supervisor' }
+
+    Webeak\Bundle\HeavyTaskBundle\Command\StopSupervisorCommand:
+        arguments:
+            - '@Webeak\Bundle\HeavyTaskBundle\SupervisorBridge'
+        tags:
+            - { name: 'console.command', command: 'wb:heavy-task:stop-supervisor' }
+
+    Webeak\Bundle\HeavyTaskBundle\Command\ExecuteTaskCommand:
+        arguments:
+            - '@Webeak\Bundle\HeavyTaskBundle\HeavyTaskRunner'
+        tags:
+            - { name: 'console.command', command: 'wb:heavy-task:execute-task' }

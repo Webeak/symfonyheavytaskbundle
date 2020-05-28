@@ -1,0 +1,30 @@
+{
+    "name": "webeak/heavy-task-bundle",
+    "type": "symfony-bundle",
+    "description": "Webeak heavy task bundle",
+    "keywords": [],
+    "homepage": "https://webeak.fr",
+    "license": "proprietary",
+    "authors": [
+        {
+            "name": "Julien Pinto",
+            "email": "jpinto@webeak.fr"
+        }
+    ],
+    "require": {
+        "php": "^7.1.3",
+        "ext-sockets": "*",
+        "symfony/config": "~4.2",
+        "symfony/framework-bundle": "^4.2",
+        "snc/redis-bundle": "^2.1",
+        "predis/predis": "^1.1",
+        "webeak/debug-bundle": "^1.0",
+        "webeak/shared-storage-bundle": "^1.0"
+    },
+    "autoload": {
+        "psr-4": { "Webeak\\Bundle\\HeavyTaskBundle\\": "src/" },
+        "exclude-from-classmap": [
+            "/Tests/"
+        ]
+    }
+}

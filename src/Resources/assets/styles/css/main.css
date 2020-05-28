@@ -1,0 +1,36 @@
+@import '~tailwindcss/base.css';
+@import '~tailwindcss/components.css';
+@import '~tailwindcss/utilities.css';
+
+html,body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    font-size: 14px;
+}
+
+body {
+    @apply bg-primary-500;
+}
+
+h1 {
+    @apply text-2xl font-medium;
+}
+
+.error,.success {
+    background: #b0413e;
+    color: #fff;
+    padding: 10px 15px;
+    font-weight: bold;
+    text-align: center;
+}
+
+.success {
+    background: #4f805d;
+}
+
+a {
+    display: block;
+    color: #fff;
+    font-size: 12px;
+}

@@ -1,0 +1,27 @@
+<div class="flex justify-between items-center border-b border-primary-500 text-primary-100 py-2 px-3 hover:bg-primary-500">
+    <div class="flex items-center w-full">
+        <div style="min-width: 90px; width: 90px;" class="text-center text-white text-sm font-medium mr-3">
+            <div class="bg-teal-500 px-2 py-1 rounded-sm text-bold" v-if="state.status === 'running'">
+                <i class="fas fa-cog fa-spin"></i> Running
+                <span class="block text-xs" v-if="state.progress"> ({{ state.progress }})</span>
+            </div>
+            <div class="bg-orange-500 px-2 py-1 rounded-sm text-bold" v-else-if="state.status === 'waiting'">Waiting</div>
+            <div class="bg-purple-400 px-2 py-1 rounded-sm text-bold" v-else-if="state.status === 'scheduled'">Scheduled</div>
+            <div class="bg-red-700 px-2 py-1 rounded-sm" v-else-if="state.status === 'crashed'">Crashed</div>
+            <div class="bg-green-500 px-2 py-1 rounded-sm" v-else-if="state.status === 'finished'">Finished</div>
+        </div>
+        <div class="flex-1">
+            {{ state.name }}
+            <div class="text-sm font-italic text-primary-400">{{ state.description }}</div>
+            <div v-if="state.status === 'crashed'" class="px-2 py-1 bg-red-700 text-white rounded-sm text-xs">
+                <span v-if="state.lastError">{{ state.lastError }}</span>
+                <span v-else>Unknown error</span>
+            </div>
+        </div>
+    </div>
+    <div class="text-sm text-italic text-primary-400 ml-2 whitespace-no-wrap">
+        {{ state.startTime }}
+        |
+        <span class="bg-primary-700 px-2 py-1 text-xs rounded-sm">{{ state.id }}</span>
+    </div>
+</div>

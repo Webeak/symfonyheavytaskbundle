@@ -1,0 +1,10 @@
+.vc-heavy-task-manager .blink {
+    animation: vc-heavy-task-manager-blink 1s ease-in-out infinite;
+}
+
+@keyframes vc-heavy-task-manager-blink {
+    0% { opacity: 0; }
+    30% { opacity: 1; }
+    70% { opacity: 1; }
+    100% { opacity: 0; }
+}

@@ -1,0 +1,15 @@
+{
+  "entrypoints": {
+    "webeakheavytask": {
+      "js": [
+        "/bundles/webeakheavytask/runtime.js",
+        "/bundles/webeakheavytask/vendors~webeakheavytask.js",
+        "/bundles/webeakheavytask/webeakheavytask.js"
+      ],
+      "css": [
+        "/bundles/webeakheavytask/vendors~webeakheavytask.css",
+        "/bundles/webeakheavytask/webeakheavytask.css"
+      ]
+    }
+  }
+}
