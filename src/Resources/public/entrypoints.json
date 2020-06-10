@@ -2,13 +2,13 @@
   "entrypoints": {
     "webeakheavytask": {
       "js": [
-        "/bundles/webeakheavytask/runtime.js",
-        "/bundles/webeakheavytask/vendors~webeakheavytask.js",
-        "/bundles/webeakheavytask/webeakheavytask.js"
+        "/bundles/webeakheavytask/runtime.6eabbe88.js",
+        "/bundles/webeakheavytask/0.934d38ed.js",
+        "/bundles/webeakheavytask/webeakheavytask.d94e7ff0.js"
       ],
       "css": [
-        "/bundles/webeakheavytask/vendors~webeakheavytask.css",
-        "/bundles/webeakheavytask/webeakheavytask.css"
+        "/bundles/webeakheavytask/0.e1d65720.css",
+        "/bundles/webeakheavytask/webeakheavytask.835fea7e.css"
       ]
     }
   }
