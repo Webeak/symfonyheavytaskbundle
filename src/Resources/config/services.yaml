@@ -44,6 +44,7 @@ services:
             - '@service_container'
             - '@Webeak\Bundle\SharedStorageBundle\SharedStorageInterface'
             - '@Webeak\Bundle\DebugBundle\Logger'
+            - '@?Webeak\Bundle\DebugBundle\TimeTracker'
 
     #
     # Commands

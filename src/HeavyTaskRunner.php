@@ -3,6 +3,7 @@ namespace Webeak\Bundle\HeavyTaskBundle;
 
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Webeak\Bundle\DebugBundle\Logger;
+use Webeak\Bundle\EssentialBundle\StaticTimeTracker;
 use Webeak\Bundle\SharedStorageBundle\SharedStorageInterface;
 
 class HeavyTaskRunner
@@ -16,11 +17,17 @@ class HeavyTaskRunner
     /** @var Logger */
     private $logger;
 
-    public function __construct(ContainerInterface $container, SharedStorageInterface $sharedStorage, Logger $logger)
+    public function __construct(ContainerInterface $container,
+                                SharedStorageInterface $sharedStorage,
+                                Logger $logger,
+                                $timeTracker = null)
     {
         $this->container = $container;
         $this->sharedStorage = $sharedStorage;
         $this->logger = $logger;
+        if ($timeTracker !== null) {
+            StaticTimeTracker::setInstance($timeTracker);
+        }
     }
 
     /**
@@ -44,14 +51,19 @@ class HeavyTaskRunner
             if (!($service instanceof HeavyTaskInterface)) {
                 throw new \Exception('The service must implement HeavyTaskInterface.');
             }
+            StaticTimeTracker::setPathInfo(sprintf('[Command] %s', $task->serviceName));
+            StaticTimeTracker::start('Execute');
             $status = $this->execute($service, $task);
+            StaticTimeTracker::end();
         } catch (\Throwable $e) {
+            StaticTimeTracker::end();
             $this->logger->error(
                 sprintf('Uncaught exception in the execution of task id "%s".', $task ? $task->supervisorId : 'Unknown'),
                 ['exception' => $e, 'payload' => $payload]
             );
         }
         $this->logger->persist();
+        StaticTimeTracker::flush();
         return $status;
     }
 
