@@ -1,6 +1,6 @@
-# Shared storage bundle
+# Heavy task bundle
 
-Offers an easy way to share temporary data between php processes.
+Handle background tasks.
 
 Read the documentation in the `doc` folder.
 
