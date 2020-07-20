@@ -163,7 +163,7 @@ class Supervisor
             ]
         ];
         $isFirstLoad = $this->data === null;
-        $this->data = $this->sharedStorage->getAndLockUntilNextSet(SharedStorageKeys::SUPERVISOR, SharedStorageKeys::NAMESPACE, 60000, $this->dataLock);
+        $this->data = $this->sharedStorage->getAndLockUntilNextSet(SharedStorageKeys::SUPERVISOR, SharedStorageKeys::NAMESPACE, 30000, 60000, $this->dataLock);
         if (!is_array($this->data) || count(array_diff(array_keys($this->data), array_keys($defaultData)))) {
             $this->data = $defaultData;
         }

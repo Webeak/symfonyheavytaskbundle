@@ -144,7 +144,7 @@ class SupervisorBridge
      */
     private function getAndLockData(string $id, &$lock)
     {
-        $data = $this->sharedStorage->getAndLockUntilNextSet(SharedStorageKeys::SUPERVISOR_BRIDGE, SharedStorageKeys::NAMESPACE, 10000, $lock);
+        $data = $this->sharedStorage->getAndLockUntilNextSet(SharedStorageKeys::SUPERVISOR_BRIDGE, SharedStorageKeys::NAMESPACE, 10000, 10000, $lock);
         if (!is_array($data) || $data['id'] !== $id) {
             return null;
         }
