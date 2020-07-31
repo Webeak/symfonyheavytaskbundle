@@ -11,4 +11,5 @@ export interface TaskInterface {
     status: string;
     consecutiveCrashesCount: number;
     lastError: string;
+    history: boolean;
 }

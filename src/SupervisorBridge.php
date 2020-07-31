@@ -26,13 +26,23 @@ class SupervisorBridge
      */
     public function initialize(string $id)
     {
-        if ($this->sharedStorage->get(SharedStorageKeys::SUPERVISOR_BRIDGE, SharedStorageKeys::NAMESPACE) !== null) {
-            $this->logger->warning('Another supervisor instance seems to be running. The current one will replace it.');
-        }
         $data = [
             'id' => $id,
             'commands' => []
         ];
+        $existingData = $this->sharedStorage->getAndLockUntilNextSet(SharedStorageKeys::SUPERVISOR_BRIDGE, SharedStorageKeys::NAMESPACE, 5, 30);
+        if ($existingData !== null) {
+            if (array_key_exists('id', $existingData) && $existingData['id'] !== null) {
+                $this->logger->warning('Another supervisor instance seems to be running. The current one will replace it.');
+            }
+            // We don't want to loose commands in queue.
+            $data = $existingData;
+            // But we do want to remove STOP commands, otherwise the process will stop immediately.
+            $data['commands'] = array_filter($data['commands'], function($item) {
+                return $item[0] !== SupervisorCommands::STOP;
+            });
+            $data['id'] = $id;
+        }
         $this->sharedStorage->set(SharedStorageKeys::SUPERVISOR_BRIDGE, $data, SharedStorageKeys::NAMESPACE);
     }
 
@@ -43,10 +53,13 @@ class SupervisorBridge
      */
     public function destroy(string $id)
     {
-        $data = $this->getData($id);
+        /** @var LockInterface $lock */
+        $data = $this->getAndLockData($id, $lock);
         if ($data !== null) {
-            $this->sharedStorage->unset(SharedStorageKeys::SUPERVISOR_BRIDGE, SharedStorageKeys::NAMESPACE);
+            $data['id'] = null;
+            $this->sharedStorage->set(SharedStorageKeys::SUPERVISOR_BRIDGE, $data, SharedStorageKeys::NAMESPACE);
         }
+        $lock->release();
     }
 
     /**
@@ -57,8 +70,9 @@ class SupervisorBridge
      * @param string             $serviceName
      * @param array              $options
      * @param integer            $startingTime
+     * @param string|null        $recurrencePattern
      */
-    public function executeTask(int $id, HeavyTaskInterface $task, string $serviceName, array $options, int $startingTime)
+    public function executeTask(int $id, HeavyTaskInterface $task, string $serviceName, array $options, int $startingTime, ?string $recurrencePattern)
     {
         $this->queueCommand(SupervisorCommands::EXECUTE_TASK, [
             'id' => $id,
@@ -66,8 +80,47 @@ class SupervisorBridge
             'description' => $task->getDescription(),
             'serviceName' => $serviceName,
             'options' => $options,
-            'time' => $startingTime
+            'time' => $startingTime,
+            'recurrencePattern' => $recurrencePattern
         ]);
+    }
+
+    /**
+     * Pause a task by id.
+     *
+     * @param integer $id
+     */
+    public function pauseTask(int $id)
+    {
+        $this->queueCommand(SupervisorCommands::PAUSE_TASK, ['id' => $id]);
+    }
+
+    /**
+     * Resume the execution of a task by id.
+     *
+     * @param integer $id
+     */
+    public function resumeTask(int $id)
+    {
+        $this->queueCommand(SupervisorCommands::RESUME_TASK, ['id' => $id]);
+    }
+
+    /**
+     * Stop the execution of a task and archive it.
+     *
+     * @param integer $id
+     */
+    public function stopTask(int $id)
+    {
+        $this->queueCommand(SupervisorCommands::STOP_TASK, ['id' => $id]);
+    }
+
+    /**
+     * Clear the history of finished tasks.
+     */
+    public function clearHistory()
+    {
+        $this->queueCommand(SupervisorCommands::CLEAR_HISTORY);
     }
 
     /**
@@ -79,28 +132,28 @@ class SupervisorBridge
     }
 
     /**
-     * Get the list of commands to execute for a supervisor id.
+     * Get the next command in queue.
      *
-     * @param string $id
+     * @param string $id supervisor id
      *
-     * @return array|null
+     * @return SupervisorCommand|null|false
      */
-    public function getCommands(string $id)
+    public function getNextCommand(string $id)
     {
         /** @var LockInterface $lock */
         $data = $this->getAndLockData($id, $lock);
         if ($data === null) {
             $lock->release();
+            return false;
+        }
+        $command = array_shift($data['commands']);
+        if ($command === null) {
+            $lock->release();
             return null;
         }
-        $commands = [];
-        foreach ($data['commands'] as $command) {
-            $commands[] = new SupervisorCommand($command[0], $command[1]);
-        }
-        $data['commands'] = [];
+        $supervisorCommand = new SupervisorCommand($command[0], $command[1]);
         $this->sharedStorage->set(SharedStorageKeys::SUPERVISOR_BRIDGE, $data, SharedStorageKeys::NAMESPACE);
-        $lock->release();
-        return $commands;
+        return $supervisorCommand;
     }
 
     /**
@@ -144,7 +197,7 @@ class SupervisorBridge
      */
     private function getAndLockData(string $id, &$lock)
     {
-        $data = $this->sharedStorage->getAndLockUntilNextSet(SharedStorageKeys::SUPERVISOR_BRIDGE, SharedStorageKeys::NAMESPACE, 10000, 10000, $lock);
+        $data = $this->sharedStorage->getAndLockUntilNextSet(SharedStorageKeys::SUPERVISOR_BRIDGE, SharedStorageKeys::NAMESPACE, 5, 10, $lock);
         if (!is_array($data) || $data['id'] !== $id) {
             return null;
         }

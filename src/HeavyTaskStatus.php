@@ -19,10 +19,21 @@ class HeavyTaskStatus
     const RUNNING = 'running';
 
     /**
+     * When a task is paused, it is totally ignored by the supervisor.
+     * You have to unpause it to put it back in the scheduled queue.
+     */
+    const PAUSED = 'paused';
+
+    /**
      * The task has stopped without confirming that everything went right to the supervisor.
      * The supervisor will restart it as soon as possible.
      */
     const CRASHED = 'crashed';
+
+    /**
+     * The task has been stopped before completion.
+     */
+    const ABORTED = 'aborted';
 
     /**
      * The task has finished its execution with success.

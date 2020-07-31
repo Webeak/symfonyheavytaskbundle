@@ -45,9 +45,21 @@ export class ManagerComponent extends Vue {
             for (const item of merged) {
                 item.startTime = moment.unix(item.startTime as number).format('MM/DD/YYYY HH:mm:ss');
                 item.active = !isUndefined(item.progress);
+                item.history = true;
+            }
+            for (const item of this.activeTasks) {
+                item.history = false;
             }
             this.ready = true;
         });
+    }
+
+    /**
+     * Clear the history of finished tasks.
+     */
+    public clearHistory(): void {
+        this.http.post('/heavy-task/ajax/clear-history');
+        this.historyTasks = [];
     }
 }
 

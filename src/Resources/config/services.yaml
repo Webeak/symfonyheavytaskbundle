@@ -65,5 +65,6 @@ services:
     Webeak\Bundle\HeavyTaskBundle\Command\ExecuteTaskCommand:
         arguments:
             - '@Webeak\Bundle\HeavyTaskBundle\HeavyTaskRunner'
+            - '@?Webeak\Bundle\DebugBundle\Logger'
         tags:
             - { name: 'console.command', command: 'wb:heavy-task:execute-task' }

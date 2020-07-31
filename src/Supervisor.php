@@ -1,16 +1,19 @@
 <?php
 namespace Webeak\Bundle\HeavyTaskBundle;
 
+use Cron\CronExpression;
 use Symfony\Component\Process\Process;
 use Webeak\Bundle\DebugBundle\Logger;
 use Webeak\Bundle\EssentialBundle\Exception\StopException;
 use Webeak\Bundle\SharedStorageBundle\LockInterface;
 use Webeak\Bundle\SharedStorageBundle\SharedStorageInterface;
 use Webeak\Component\Utils\RandomGenerator;
+use Webeak\Component\Utils\StringUtils;
+use Webeak\Component\Utils\UtilPhp;
 
 class Supervisor
 {
-    const SHARED_STORAGE_FLUSH_INTERVAL = 30000;
+    const SHARED_STORAGE_LOCK_TIMEOUT = 120;
 
     /**
      * Random id for this supervisor instance.
@@ -101,14 +104,18 @@ class Supervisor
 
     /**
      * Stop the supervisor.
+     *
+     * @param boolean $andSave (optional, default true)
      */
-    public function stop()
+    public function stop($andSave = true)
     {
         if ($this->started) {
             $this->logger->debug('Stopping supervisor...');
             $this->bridge->destroy($this->id);
             $this->started = false;
-            $this->saveData(false);
+            if ($andSave) {
+                $this->saveData(false);
+            }
             if (!$this->dataLock) {
                 $this->dataLock->release();
             }
@@ -123,14 +130,13 @@ class Supervisor
      */
     private function loop()
     {
-        $lastDataSaveTime = time();
         while (true) {
-            $time = time();
             try {
                 if (!$this->tick()) {
                     break;
                 }
             } catch (StopException $e) {
+                $this->stop();
                 break ;
             } catch (\Throwable $e) {
                 $this->logger->error(
@@ -138,10 +144,7 @@ class Supervisor
                     ['exception' => $e]
                 );
             }
-            if ($time - $lastDataSaveTime >= self::SHARED_STORAGE_FLUSH_INTERVAL) {
-                $this->saveData();
-                $lastDataSaveTime = $time;
-            }
+            $this->saveData();
             usleep($this->tickInterval * 1000);
         }
     }
@@ -159,15 +162,31 @@ class Supervisor
                 HeavyTaskStatus::SCHEDULED => [],
                 HeavyTaskStatus::WAITING => [],
                 HeavyTaskStatus::CRASHED => [],
-                HeavyTaskStatus::RUNNING => []
+                HeavyTaskStatus::RUNNING => [],
+                HeavyTaskStatus::PAUSED => []
             ]
         ];
         $isFirstLoad = $this->data === null;
-        $this->data = $this->sharedStorage->getAndLockUntilNextSet(SharedStorageKeys::SUPERVISOR, SharedStorageKeys::NAMESPACE, 30000, 60000, $this->dataLock);
+        $this->data = $this->sharedStorage->getAndLockUntilNextSet(
+            SharedStorageKeys::SUPERVISOR,
+            SharedStorageKeys::NAMESPACE,
+            self::SHARED_STORAGE_LOCK_TIMEOUT,
+            self::SHARED_STORAGE_LOCK_TIMEOUT  + 10,
+            $this->dataLock
+        );
         if (!is_array($this->data) || count(array_diff(array_keys($this->data), array_keys($defaultData)))) {
             $this->data = $defaultData;
         }
         if ($isFirstLoad) {
+            foreach ($this->data as $key => $values) {
+                if ($key === 'queues') {
+                    foreach ($values as $queue => $tasks) {
+                        $this->data[$key][$queue] = $this->unserializeTasks($tasks);
+                    }
+                } else {
+                    $this->data[$key] = $this->unserializeTasks($values);
+                }
+            }
             $this->data['queues'] = $defaultData['queues'];
             foreach ($this->data['tasks'] as $task) {
                 /** @var SupervisorTask $task */
@@ -183,7 +202,6 @@ class Supervisor
                         $task->status = HeavyTaskStatus::WAITING;
                     }
                 }
-
                 if (array_key_exists($task->status, $this->data['queues'])) {
                     $this->data['queues'][$task->status][] = $task;
                 }
@@ -201,12 +219,12 @@ class Supervisor
     private function saveData($refreshLock = true)
     {
         $this->sharedStorage->set(SharedStorageKeys::SUPERVISOR, $this->data, SharedStorageKeys::NAMESPACE);
-        $this->sharedStorage->set(SharedStorageKeys::SUPERVISOR_PUBLIC, $this->buildPublicData(), SharedStorageKeys::NAMESPACE);
-
         if ($refreshLock) {
             // To refresh the lock.
             $this->loadData();
         }
+        $this->sharedStorage->set(SharedStorageKeys::SUPERVISOR_PUBLIC, $this->buildPublicData(), SharedStorageKeys::NAMESPACE);
+
     }
 
     /**
@@ -218,20 +236,26 @@ class Supervisor
      */
     private function tick(): bool
     {
-        $commands = $this->bridge->getCommands($this->id);
-        if ($commands === null) {
-            $this->logger->warning('No more data available for this supervisor instance.');
-            $this->stop();
-            return false;
-        }
-        foreach ($commands as $command) {
+        $startTime = time();
+        $timeout = self::SHARED_STORAGE_LOCK_TIMEOUT * 0.8; // 80% of the timeout to be safe.
+        while (($command = $this->bridge->getNextCommand($this->id)) !== null) {
+            if ($command === false) {
+                $this->logger->warning('No more data available for this supervisor instance.');
+                $this->stop(false);
+                return false;
+            }
             $this->executeCommand($command);
+            // In case we have so much commands to process that we come close to the lock timeout.
+            // In such a case we must stop and let the tick go to ensure the lock is refreshed.
+            if (time() - $startTime >= $timeout) {
+                // Take no risk and skip the processing of queues for this one, we need to refresh the lock fast.
+                return true;
+            }
         }
         $this->processScheduledQueue();
         $this->processWaitingQueue();
         $this->processCrashedQueue();
         $this->watchRunningProcesses();
-        $this->saveData();
         return true;
     }
 
@@ -248,6 +272,22 @@ class Supervisor
         switch ($command->name) {
             case SupervisorCommands::EXECUTE_TASK: {
                 $this->registerTask($command->payload);
+            } break ;
+
+            case SupervisorCommands::PAUSE_TASK: {
+                $this->pauseTask($command->payload);
+            } break ;
+
+            case SupervisorCommands::RESUME_TASK: {
+                $this->resumeTask($command->payload);
+            } break ;
+
+            case SupervisorCommands::STOP_TASK: {
+                $this->stopTask($command->payload);
+            } break ;
+
+            case SupervisorCommands::CLEAR_HISTORY: {
+                $this->clearHistory();
             } break ;
 
             case SupervisorCommands::STOP: {
@@ -301,7 +341,7 @@ class Supervisor
     private function processCrashedQueue()
     {
         // Only add crashed process when there is nothing else to do.
-        if (count($this->data['queues'][HeavyTaskStatus::RUNNING]) || count($this->data['queues'][HeavyTaskStatus::WAITING])) {
+        if (count($this->data['queues'][HeavyTaskStatus::RUNNING]) + count($this->data['queues'][HeavyTaskStatus::WAITING]) >= $this->maxParallelProcesses) {
             return ;
         }
         $this->data['queues'][HeavyTaskStatus::WAITING] = $this->data['queues'][HeavyTaskStatus::CRASHED];
@@ -325,11 +365,83 @@ class Supervisor
         $task->serviceName = $payload['serviceName'];
         $task->options = $payload['options'];
         $task->time = $payload['time'];
+        $task->recurrencePattern = $payload['recurrencePattern'];
         $task->status = HeavyTaskStatus::SCHEDULED;
         $task->consecutiveCrashesCount = 0;
 
+        if (array_key_exists('unique', $task->options) && $task->options['unique'] === true) {
+            foreach ($this->data['tasks'] as $id => $candidate) {
+                /** @var SupervisorTask $candidate */
+                if ($candidate->serviceName === $task->serviceName) {
+                    $this->logger->info(sprintf(
+                        'Registering of task "%s" has been ignored because another task '.
+                        'of this type is already running and it has been marked as unique.',
+                        $candidate->serviceName
+                    ));
+                    return ;
+                }
+            }
+        }
         $this->data['tasks'][$task->supervisorId] = $task;
         $this->data['queues'][HeavyTaskStatus::SCHEDULED][] = $task;
+    }
+
+    /**
+     * Pause the execution of a task.
+     *
+     * @param array $payload
+     */
+    private function pauseTask(array $payload)
+    {
+        foreach ($this->data['tasks'] as $taskId => $task) {
+            /** @var SupervisorTask $task */
+            if ($task->publicId === $payload['id']) {
+                $this->updateTaskStatus($taskId, HeavyTaskStatus::PAUSED);
+            }
+        }
+        $this->saveData();
+    }
+
+    /**
+     * Resume the execution of a paused task.
+     *
+     * @param array $payload
+     */
+    private function resumeTask(array $payload)
+    {
+        foreach ($this->data['tasks'] as $taskId => $task) {
+            /** @var SupervisorTask $task */
+            if ($task->publicId === $payload['id']) {
+                $this->updateTaskStatus($taskId, HeavyTaskStatus::SCHEDULED);
+            }
+        }
+        $this->saveData();
+    }
+
+    /**
+     * Stop the execution of a task.
+     *
+     * @param array $payload
+     */
+    private function stopTask(array $payload)
+    {
+        foreach ($this->data['tasks'] as $taskId => $task) {
+            /** @var SupervisorTask $task */
+            if ($task->publicId === $payload['id']) {
+                $task->status = HeavyTaskStatus::ABORTED;
+                $this->addToHistory($task);
+            }
+        }
+        $this->saveData();
+    }
+
+    /**
+     * Clear the finished tasks history.
+     */
+    private function clearHistory()
+    {
+        $this->data['history'] = [];
+        $this->saveData();
     }
 
     /**
@@ -367,7 +479,6 @@ class Supervisor
             0 => HeavyTaskStatus::WAITING,
             1 => HeavyTaskStatus::CRASHED
         ];
-        $changed = false;
         for ($i = 0, $c = count($this->runningProcesses); $i < $c; ++$i) {
             /** @var Process $runningProcess */
             $runningProcess = $this->runningProcesses[$i]['process'];
@@ -392,12 +503,10 @@ class Supervisor
                     ));
                     $newStatus = HeavyTaskStatus::FINISHED;
                 }
-                $this->updateTaskStatus($task->supervisorId, $newStatus);
-                $changed = true;
+                if (!$this->isInQueue($task, HeavyTaskStatus::PAUSED)) {
+                    $this->updateTaskStatus($task->supervisorId, $newStatus);
+                }
             }
-        }
-        if ($changed) {
-            $this->saveData();
         }
     }
 
@@ -437,8 +546,51 @@ class Supervisor
             $task->consecutiveCrashesCount = 0;
         }
         if ($task->status === HeavyTaskStatus::FINISHED) {
-            $this->addToHistory($task);
+            if (!$this->maybeRequeueForRecurrence($task)) {
+                $this->addToHistory($task);
+            }
         }
+    }
+
+    private function maybeRequeueForRecurrence(SupervisorTask $task): bool
+    {
+        if ($task->recurrencePattern) {
+            try {
+                $cron = CronExpression::factory($task->recurrencePattern);
+                $nextRunDate = $cron->getNextRunDate();
+                if ($nextRunDate instanceof \DateTime) {
+                    $timestamp = $nextRunDate->getTimestamp();
+                    $task->time = $timestamp;
+                    $task->status = HeavyTaskStatus::SCHEDULED;
+                    $this->data['queues'][HeavyTaskStatus::SCHEDULED][] = $task;
+                    return true;
+                }
+            } catch (\Throwable $e) {
+                $this->logger->error(sprintf(
+                    'Failed to requeue task "%s" using recurrence pattern "%s". Original error: %s',
+                    $task->name,
+                    $task->recurrencePattern,
+                    $e->getMessage()
+                ), ['task' => $task, 'exception' => $e]);
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Check if a task is in a queue.
+     *
+     * @param SupervisorTask $task
+     * @param string         $queueName
+     *
+     * @return boolean
+     */
+    private function isInQueue(SupervisorTask $task, string $queueName): bool
+    {
+        if (!array_key_exists($queueName, $this->data['queues'])) {
+            return false;
+        }
+        return in_array($task, $this->data['queues'][$queueName], true);
     }
 
     /**
@@ -486,7 +638,8 @@ class Supervisor
      */
     private function buildPublicData(): array
     {
-        $normalizeSupervisorTask = function(SupervisorTask $task): array {
+        $currentTime = time();
+        $normalizeSupervisorTask = function(SupervisorTask $task) use($currentTime): array  {
             return [
                 'id' => $task->publicId,
                 'name' => $task->name,
@@ -494,6 +647,7 @@ class Supervisor
                 'service' => $task->serviceName,
                 'options' => $task->options,
                 'startTime' => $task->time,
+                'timeBeforeStartText' => $task->time && $task->time > $currentTime ? UtilPhp::human_time_diff($currentTime, $task->time, false, '') : null,
                 'status' => $task->status,
                 'consecutiveCrashesCount' => $task->consecutiveCrashesCount,
                 'lastError' => $task->lastError
@@ -517,6 +671,26 @@ class Supervisor
         foreach ($this->data['history'] as $historyTask) {
             /** @var SupervisorTask $historyTask */
             $output['history'][] = $normalizeSupervisorTask($historyTask);
+        }
+        return $output;
+    }
+
+    /**
+     * Unserialize an array of tasks.
+     *
+     * @param array $tasks
+     *
+     * @return array
+     */
+    private function unserializeTasks(array $tasks): array
+    {
+        $output = [];
+        foreach ($tasks as $key => $task) {
+            if (is_array($task)) {
+                $output[$key] = SupervisorTask::CreateFromArray($task);
+            } else if ($task instanceof SupervisorTask) {
+                $output[$key] = $task;
+            }
         }
         return $output;
     }

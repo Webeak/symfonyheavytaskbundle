@@ -8,6 +8,7 @@ use Webeak\Bundle\EssentialBundle\Controller\JsonController;
 use Webeak\Bundle\EssentialBundle\HttpFoundation\XssiSafeJsonResponse;
 use Webeak\Bundle\HeavyTaskBundle\HeavyTaskManager;
 use Webeak\Bundle\HeavyTaskBundle\SupervisorBridge;
+use Webeak\Component\Utils\ArrayUtils;
 
 class ManagerController extends JsonController
 {
@@ -41,6 +42,70 @@ class ManagerController extends JsonController
     public function supervisorStatusJson(SupervisorBridge $bridge)
     {
         return new XssiSafeJsonResponse($bridge->getPublicStatus());
+    }
+
+    /**
+     * @Route(name="wb_heavy_task_ajax_pause_task", path="/heavy-task/ajax/pause-task", methods={"POST"})
+     *
+     * @return Response
+     *
+     * @throws
+     */
+    public function pauseTask()
+    {
+        $id = ArrayUtils::getValue($this->getRequestPayload(), 'id');
+        if (!$id || !is_numeric($id)) {
+            $this->stopForBadInput();
+        }
+        $this->manager->pause($id);
+        return new Response();
+    }
+
+    /**
+     * @Route(name="wb_heavy_task_ajax_resume_task", path="/heavy-task/ajax/resume-task", methods={"POST"})
+     *
+     * @return Response
+     *
+     * @throws
+     */
+    public function resumeTask()
+    {
+        $id = ArrayUtils::getValue($this->getRequestPayload(), 'id');
+        if (!$id || !is_numeric($id)) {
+            $this->stopForBadInput();
+        }
+        $this->manager->resume($id);
+        return new Response();
+    }
+
+    /**
+     * @Route(name="wb_heavy_task_ajax_stop_task", path="/heavy-task/ajax/stop-task", methods={"POST"})
+     *
+     * @return Response
+     *
+     * @throws
+     */
+    public function stopTask()
+    {
+        $id = ArrayUtils::getValue($this->getRequestPayload(), 'id');
+        if (!$id || !is_numeric($id)) {
+            $this->stopForBadInput();
+        }
+        $this->manager->stop($id);
+        return new Response();
+    }
+
+    /**
+     * @Route(name="wb_heavy_task_ajax_clear_history", path="/heavy-task/ajax/clear-history", methods={"POST"})
+     *
+     * @return Response
+     *
+     * @throws
+     */
+    public function clearHistory()
+    {
+        $this->manager->clearHistory();
+        return new Response();
     }
 
     /**

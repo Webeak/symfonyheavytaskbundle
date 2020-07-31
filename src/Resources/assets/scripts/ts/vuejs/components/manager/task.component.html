@@ -1,13 +1,14 @@
 <div class="flex justify-between items-center border-b border-primary-500 text-primary-100 py-2 px-3 hover:bg-primary-500">
-    <div class="flex items-center w-full">
+    <div class="flex items-start w-full">
         <div style="min-width: 90px; width: 90px;" class="text-center text-white text-sm font-medium mr-3">
             <div class="bg-teal-500 px-2 py-1 rounded-sm text-bold" v-if="state.status === 'running'">
                 <i class="fas fa-cog fa-spin"></i> Running
-                <span class="block text-xs" v-if="state.progress"> ({{ state.progress }})</span>
             </div>
             <div class="bg-orange-500 px-2 py-1 rounded-sm text-bold" v-else-if="state.status === 'waiting'">Waiting</div>
+            <div class="bg-gray-500 px-2 py-1 rounded-sm text-bold" v-else-if="state.status === 'paused'">Paused</div>
             <div class="bg-purple-400 px-2 py-1 rounded-sm text-bold" v-else-if="state.status === 'scheduled'">Scheduled</div>
             <div class="bg-red-700 px-2 py-1 rounded-sm" v-else-if="state.status === 'crashed'">Crashed</div>
+            <div class="bg-red-500 px-2 py-1 rounded-sm" v-else-if="state.status === 'aborted'">Aborted</div>
             <div class="bg-green-500 px-2 py-1 rounded-sm" v-else-if="state.status === 'finished'">Finished</div>
         </div>
         <div class="flex-1">
@@ -17,11 +18,27 @@
                 <span v-if="state.lastError">{{ state.lastError }}</span>
                 <span v-else>Unknown error</span>
             </div>
+            <span class="block text-bold text-green-400 text-xs" v-if="state.status === 'running' && state.progress">Progress: {{ state.progress }}</span>
+            <span class="block text-bold text-purple-400 text-xs" v-if="state.status === 'scheduled' && state.timeBeforeStartText">Scheduled to run in {{ state.timeBeforeStartText }}.</span>
         </div>
     </div>
     <div class="text-sm text-italic text-primary-400 ml-2 whitespace-no-wrap">
         {{ state.startTime }}
         |
         <span class="bg-primary-700 px-2 py-1 text-xs rounded-sm">{{ state.id }}</span>
+        <div class="flex items-center" v-if="!state.history">
+            <a href="" class="flex rounded-sm bg-orange-500 mr-1" style="padding: 0.35rem" @click.prevent="pause()" :disabled="isActionRunning" v-if="state.status !== 'paused'">
+                <i class="fas fa-pause fa-xs" v-if="!isPausing"></i>
+                <i class="fas fa-cog fa-xs fa-spin" v-else></i>
+            </a>
+            <a href="" class="flex rounded-sm bg-green-500 mr-1" style="padding: 0.35rem" @click.prevent="resume()" :disabled="isActionRunning" v-if="state.status === 'paused'">
+                <i class="fas fa-play fa-xs" v-if="!isResuming"></i>
+                <i class="fas fa-cog fa-xs fa-spin" v-else></i>
+            </a>
+            <a href="" class="flex rounded-sm bg-red-500" style="padding: 0.35rem" @click.prevent="stop()" :disabled="isActionRunning">
+                <i class="fas fa-stop fa-xs" v-if="!isStopping"></i>
+                <i class="fas fa-cog fa-xs fa-spin" v-else></i>
+            </a>
+        </div>
     </div>
 </div>

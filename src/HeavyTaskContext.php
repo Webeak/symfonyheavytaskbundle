@@ -41,6 +41,11 @@ class HeavyTaskContext
         $this->error = null;
         $this->storage = [];
     }
+    
+    public function setSharedStorage(SharedStorageInterface $sharedStorage)
+    {
+        $this->sharedStorage = $sharedStorage;
+    }
 
     /**
      * Get the unique identifier of the task.
@@ -205,5 +210,18 @@ class HeavyTaskContext
     public static function getStorageKey(int $taskPublicId): string
     {
         return str_replace('%id%', $taskPublicId, SharedStorageKeys::TASK_CONTEXT);
+    }
+
+    public function __sleep()
+    {
+        return [
+            'id',
+            'options',
+            'progress',
+            'completed',
+            'error',
+            'storage',
+            'storageKey'
+        ];
     }
 }

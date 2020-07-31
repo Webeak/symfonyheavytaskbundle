@@ -43,10 +43,11 @@ class HeavyTaskManager
      * Start a task in background.
      *
      * @param string  $serviceName
-     * @param array   $options      (optional, default: [])
-     * @param integer $startingTime (optional, default: null) If you want to delay the start. The task will start immediately if not defined.
+     * @param array   $options           (optional, default: [])
+     * @param integer $startingTime      (optional, default: null) If you want to delay the start. The task will start immediately if not defined.
+     * @param string  $recurrencePattern (optional, default: null)
      */
-    public function start(string $serviceName, array $options = [], $startingTime = null)
+    public function start(string $serviceName, array $options = [], ?int $startingTime = null, ?string $recurrencePattern = null)
     {
         $serviceInstance = $this->container->get($serviceName);
         if (!($serviceInstance instanceof HeavyTaskInterface)) {
@@ -55,13 +56,58 @@ class HeavyTaskManager
         }
         $id = $this->generateTaskId();
         $this->logger->debug(sprintf('Starting task "%s".', $serviceName), ['id' => $id]);
-        $this->bridge->executeTask($id, $serviceInstance, $serviceName, $options, $startingTime !== null ? intval($startingTime) : time());
+        $this->bridge->executeTask(
+            $id,
+            $serviceInstance,
+            $serviceName,
+            $options,
+            $startingTime !== null ? intval($startingTime) : time(),
+            $recurrencePattern
+        );
         $sessionData = ArrayUtils::ensureArray($this->session->get(self::SESSION_STORAGE_KEY));
         if (!array_key_exists('tasks', $sessionData)) {
             $sessionData['tasks'] = [];
         }
         $sessionData['tasks'][] = $id;
         $this->session->set(self::SESSION_STORAGE_KEY, $sessionData);
+    }
+
+    /**
+     * Pause a task by id.
+     *
+     * @param integer $id
+     */
+    public function pause(int $id)
+    {
+        $this->bridge->pauseTask($id);
+    }
+
+    /**
+     * Resume the execution of a task by id.
+     *
+     * @param integer $id
+     */
+    public function resume(int $id)
+    {
+        $this->bridge->resumeTask($id);
+    }
+
+    /**
+     * Stop the execution of a task and archive it.
+     *
+     * @param integer $id
+     */
+    public function stop(int $id)
+    {
+        $this->bridge->stopTask($id);
+    }
+
+    /**
+     * Clear the history of done tasks.
+     */
+    public function clearHistory()
+    {
+        $this->bridge->clearHistory();
     }
 
     /**

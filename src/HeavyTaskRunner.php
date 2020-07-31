@@ -39,6 +39,9 @@ class HeavyTaskRunner
      */
     public function run(string $payload): int
     {
+        set_time_limit(0);
+        ini_set('memory_limit', -1);
+        
         /** @var SupervisorTask $task */
         $task = null;
         $status = 1;
@@ -85,6 +88,7 @@ class HeavyTaskRunner
             $task->execute($context);
             $context->setError(null);
         } catch (\Throwable $e) {
+            $this->logger->critical(sprintf('Uncaught exception while running task "%s". Error: %s', $task->getName(), $e->getMessage()), ['exception' => $e]);
             $context->setError($e->getMessage());
         }
         return $this->saveContextAndRespond($context);
@@ -103,6 +107,7 @@ class HeavyTaskRunner
             $storageKey = HeavyTaskContext::getStorageKey($supervisorTask->publicId);
             $context = $this->sharedStorage->get($storageKey, SharedStorageKeys::NAMESPACE);
             if ($context instanceof HeavyTaskContext) {
+                $context->setSharedStorage($this->sharedStorage);
                 return $context;
             }
         } catch (\Throwable $e) {

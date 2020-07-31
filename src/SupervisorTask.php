@@ -53,6 +53,13 @@ class SupervisorTask
     public $time;
 
     /**
+     * Cron pattern defining the next time the task will execute.
+     *
+     * @var string
+     */
+    public $recurrencePattern;
+
+    /**
      * Current status of the task.
      *
      * @see HeavyTaskStatus
@@ -81,4 +88,22 @@ class SupervisorTask
      * @var integer|null
      */
     public $pid;
+    
+    public static function CreateFromArray(array $data)
+    {
+        $instance = new SupervisorTask();
+        $instance->publicId = $data['publicId'];
+        $instance->supervisorId = $data['supervisorId'];
+        $instance->name = $data['name'];
+        $instance->description = $data['description'];
+        $instance->serviceName = $data['serviceName'];
+        $instance->options = $data['options'];
+        $instance->time = $data['time'];
+        $instance->recurrencePattern = $data['recurrencePattern'];
+        $instance->status = $data['status'];
+        $instance->consecutiveCrashesCount = $data['consecutiveCrashesCount'];
+        $instance->lastError = $data['lastError'];
+        $instance->pid = $data['pid'];
+        return $instance;
+    }
 }
