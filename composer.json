@@ -17,6 +17,7 @@
         "dragonmantank/cron-expression": "^3.0",
         "symfony/config": "~4.2",
         "symfony/framework-bundle": "^4.2",
+        "symfony/process": "~4.2",
         "snc/redis-bundle": "^2.1",
         "predis/predis": "^1.1",
         "webeak/debug-bundle": "^1.0",
