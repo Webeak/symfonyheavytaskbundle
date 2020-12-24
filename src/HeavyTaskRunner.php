@@ -3,6 +3,7 @@ namespace Webeak\Bundle\HeavyTaskBundle;
 
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Webeak\Bundle\DebugBundle\Logger;
+use Webeak\Bundle\EssentialBundle\StaticSharedStorage;
 use Webeak\Bundle\EssentialBundle\StaticTimeTracker;
 use Webeak\Bundle\SharedStorageBundle\SharedStorageInterface;
 
@@ -28,6 +29,7 @@ class HeavyTaskRunner
         if ($timeTracker !== null) {
             StaticTimeTracker::setInstance($timeTracker);
         }
+        StaticSharedStorage::setInstance($sharedStorage);
     }
 
     /**
@@ -41,7 +43,7 @@ class HeavyTaskRunner
     {
         set_time_limit(0);
         ini_set('memory_limit', -1);
-        
+
         /** @var SupervisorTask $task */
         $task = null;
         $status = 1;
@@ -54,19 +56,14 @@ class HeavyTaskRunner
             if (!($service instanceof HeavyTaskInterface)) {
                 throw new \Exception('The service must implement HeavyTaskInterface.');
             }
-            StaticTimeTracker::setPathInfo(sprintf('[Command] %s', $task->serviceName));
-            StaticTimeTracker::start('Execute');
             $status = $this->execute($service, $task);
-            StaticTimeTracker::end();
-        } catch (\Throwable $e) {
-            StaticTimeTracker::end();
+        } catch (\Exception | \Throwable $e) {
             $this->logger->error(
                 sprintf('Uncaught exception in the execution of task id "%s".', $task ? $task->supervisorId : 'Unknown'),
                 ['exception' => $e, 'payload' => $payload]
             );
         }
         $this->logger->persist();
-        StaticTimeTracker::flush();
         return $status;
     }
 
@@ -87,7 +84,7 @@ class HeavyTaskRunner
         try {
             $task->execute($context);
             $context->setError(null);
-        } catch (\Throwable $e) {
+        } catch (\Exception | \Throwable $e) {
             $this->logger->critical(sprintf('Uncaught exception while running task "%s". Error: %s', $task->getName(), $e->getMessage()), ['exception' => $e]);
             $context->setError($e->getMessage());
         }
@@ -110,7 +107,7 @@ class HeavyTaskRunner
                 $context->setSharedStorage($this->sharedStorage);
                 return $context;
             }
-        } catch (\Throwable $e) {
+        } catch (\Exception | \Throwable $e) {
             $this->logger->error(sprintf('Failed to restore context for task %d.', $supervisorTask->publicId), ['task' => $supervisorTask]);
             return null;
         }
