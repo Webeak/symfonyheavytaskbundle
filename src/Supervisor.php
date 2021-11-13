@@ -455,7 +455,6 @@ class Supervisor
             $this->logger->error(sprintf('No task id "%s" has been found.', $id));
             return ;
         }
-        $this->logger->debug('Executing task.', ['id' => $id]);
         /** @var SupervisorTask $task */
         $task = $this->data['tasks'][$id];
         $task->status = HeavyTaskStatus::RUNNING;
@@ -465,8 +464,6 @@ class Supervisor
         $process->start();
         $task->pid = $process->getPid();
         $this->runningProcesses[] = ['task' => $task, 'process' => $process];
-
-        $this->logger->notice(sprintf('Running process on pid %d.', $task->pid), ['process' => $process]);
     }
 
     /**

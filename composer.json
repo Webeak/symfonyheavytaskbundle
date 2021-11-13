@@ -12,7 +12,7 @@
         }
     ],
     "require": {
-        "php": "^7.1.3",
+        "php": "^7.1.3||^8.0",
         "ext-sockets": "*",
         "dragonmantank/cron-expression": "^3.0",
         "symfony/config": "~4.2",
