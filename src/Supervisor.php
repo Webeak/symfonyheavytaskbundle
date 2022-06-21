@@ -97,7 +97,7 @@ class Supervisor
         $this->id = RandomGenerator::randomString(64, RandomGenerator::HEXADECIMAL);
         $this->bridge->initialize($this->id);
         $this->loadData();
-        $this->logger->debug('Supervisor initialized.');
+        $this->logger->info('Supervisor initialized.');
         $this->started = true;
         $this->loop();
     }
@@ -110,7 +110,7 @@ class Supervisor
     public function stop($andSave = true)
     {
         if ($this->started) {
-            $this->logger->debug('Stopping supervisor...');
+            $this->logger->info('Stopping supervisor...');
             $this->bridge->destroy($this->id);
             $this->started = false;
             if ($andSave) {
@@ -268,7 +268,6 @@ class Supervisor
      */
     private function executeCommand(SupervisorCommand $command)
     {
-        $this->logger->debug('Executing command.', ['command' => $command]);
         switch ($command->name) {
             case SupervisorCommands::EXECUTE_TASK: {
                 $this->registerTask($command->payload);
@@ -355,8 +354,6 @@ class Supervisor
      */
     private function registerTask(array $payload)
     {
-        $this->logger->debug('Register task.', ['payload' => $payload]);
-
         $task = new SupervisorTask();
         $task->publicId = $payload['id'];
         $task->supervisorId = $this->generateTaskUniqueId();
@@ -460,7 +457,7 @@ class Supervisor
         $task->status = HeavyTaskStatus::RUNNING;
         $this->data['queues'][HeavyTaskStatus::RUNNING][] = $task;
 
-        $process = new Process(['php', $this->projectDir . '/bin/console', 'wb:heavy-task:execute-task', base64_encode(serialize($task))]);
+        $process = new Process(['php', $this->projectDir . '/bin/console', 'wb:heavy-task:execute-task', base64_encode(serialize($task))], $this->projectDir);
         $process->start();
         $task->pid = $process->getPid();
         $this->runningProcesses[] = ['task' => $task, 'process' => $process];
