@@ -64,12 +64,18 @@ class HeavyTaskManager
             $startingTime !== null ? intval($startingTime) : time(),
             $recurrencePattern
         );
-        $sessionData = ArrayUtils::ensureArray($this->session->get(self::SESSION_STORAGE_KEY));
-        if (!array_key_exists('tasks', $sessionData)) {
-            $sessionData['tasks'] = [];
+        try {
+            $sessionData = ArrayUtils::ensureArray($this->session->get(self::SESSION_STORAGE_KEY));
+            if (!array_key_exists('tasks', $sessionData)) {
+                $sessionData['tasks'] = [];
+            }
+            $sessionData['tasks'][] = $id;
+            $this->session->set(self::SESSION_STORAGE_KEY, $sessionData);
+        } catch (\Exception | \Throwable $e) {
+            // Ignore the error.
+            // May fail if the task is queued after the headers have been sent
+            // if the session has not yet been started.
         }
-        $sessionData['tasks'][] = $id;
-        $this->session->set(self::SESSION_STORAGE_KEY, $sessionData);
     }
 
     /**
