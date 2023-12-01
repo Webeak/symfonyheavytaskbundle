@@ -8,7 +8,6 @@ use Webeak\Bundle\EssentialBundle\Exception\StopException;
 use Webeak\Bundle\SharedStorageBundle\LockInterface;
 use Webeak\Bundle\SharedStorageBundle\SharedStorageInterface;
 use Webeak\Component\Utils\RandomGenerator;
-use Webeak\Component\Utils\StringUtils;
 use Webeak\Component\Utils\UtilPhp;
 
 class Supervisor
@@ -370,11 +369,6 @@ class Supervisor
             foreach ($this->data['tasks'] as $id => $candidate) {
                 /** @var SupervisorTask $candidate */
                 if ($candidate->serviceName === $task->serviceName) {
-                    $this->logger->info(sprintf(
-                        'Registering of task "%s" has been ignored because another task '.
-                        'of this type is already running and it has been marked as unique.',
-                        $candidate->serviceName
-                    ));
                     return ;
                 }
             }
@@ -622,7 +616,7 @@ class Supervisor
                 return $id;
             }
         } while($tries < $maxTries);
-        $this->logger->critical(sprintf('Failed to generate a unique id for a task after %d tries.', $tries));
+        throw new \Exception(sprintf('Failed to generate a unique id for a task after %d tries.', $tries));
     }
 
     /**

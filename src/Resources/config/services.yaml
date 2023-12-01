@@ -68,3 +68,10 @@ services:
             - '@?Webeak\Bundle\DebugBundle\Logger'
         tags:
             - { name: 'console.command', command: 'wb:heavy-task:execute-task' }
+
+    Webeak\Bundle\HeavyTaskBundle\Command\StartCommand:
+        arguments:
+            - '@Webeak\Bundle\HeavyTaskBundle\HeavyTaskManager'
+            - '@?Webeak\Bundle\DebugBundle\Logger'
+        tags:
+            - { name: 'console.command', command: 'wb:heavy-task:start' }

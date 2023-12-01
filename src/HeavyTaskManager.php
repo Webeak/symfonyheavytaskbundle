@@ -55,7 +55,7 @@ class HeavyTaskManager
             return ;
         }
         $id = $this->generateTaskId();
-        $this->logger->debug(sprintf('Starting task "%s".', $serviceName), ['id' => $id]);
+        // $this->logger->debug(sprintf('Starting task "%s".', $serviceName), ['id' => $id]);
         $this->bridge->executeTask(
             $id,
             $serviceInstance,
@@ -64,18 +64,12 @@ class HeavyTaskManager
             $startingTime !== null ? intval($startingTime) : time(),
             $recurrencePattern
         );
-        try {
-            $sessionData = ArrayUtils::ensureArray($this->session->get(self::SESSION_STORAGE_KEY));
-            if (!array_key_exists('tasks', $sessionData)) {
-                $sessionData['tasks'] = [];
-            }
-            $sessionData['tasks'][] = $id;
-            $this->session->set(self::SESSION_STORAGE_KEY, $sessionData);
-        } catch (\Exception | \Throwable $e) {
-            // Ignore the error.
-            // May fail if the task is queued after the headers have been sent
-            // if the session has not yet been started.
+        $sessionData = ArrayUtils::ensureArray($this->session->get(self::SESSION_STORAGE_KEY));
+        if (!array_key_exists('tasks', $sessionData)) {
+            $sessionData['tasks'] = [];
         }
+        $sessionData['tasks'][] = $id;
+        $this->session->set(self::SESSION_STORAGE_KEY, $sessionData);
     }
 
     /**

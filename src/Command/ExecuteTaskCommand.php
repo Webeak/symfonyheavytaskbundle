@@ -27,7 +27,7 @@ class ExecuteTaskCommand extends Command
     {
         $this->setName('wb:heavy-task:execute-task')
             ->addArgument('payload', InputArgument::REQUIRED, 'Serialized SupervisorTask instance.')
-            ->setDescription('Execute a task.');
+            ->setDescription('Execute a task. Meant to be used by the supervisor. To execute a task via command line, use "wb:heavy-task:start" instead.');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output)
@@ -35,4 +35,3 @@ class ExecuteTaskCommand extends Command
         return $this->runner->run($input->getArgument('payload'));
     }
 }
-
