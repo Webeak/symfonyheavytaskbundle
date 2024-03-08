@@ -28,7 +28,8 @@ class StartCommand extends Command
     {
         $this->setName('wb:heavy-task:start')
             ->addArgument('fqcn', InputArgument::REQUIRED, 'The FQCN of the task to execute.')
-            ->addOption('unique', '--unique', InputOption::VALUE_NONE, 'Ensure the task only execute if not already running.')
+            ->addOption('unique', 'u', InputOption::VALUE_NONE, 'Ensure the task only execute if not already running.')
+            ->addOption('recurring', 'r', InputOption::VALUE_OPTIONAL, 'Define a recurrence pattern.')
             ->setDescription('Start a task.');
     }
 
@@ -38,6 +39,6 @@ class StartCommand extends Command
         if ($input->getOption('unique')) {
             $options['unique'] = true;
         }
-        return $this->manager->start($input->getArgument('fqcn'), $options);
+        return $this->manager->start($input->getArgument('fqcn'), $options, null, $input->getOption('recurring'));
     }
 }
