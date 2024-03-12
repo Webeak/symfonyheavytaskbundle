@@ -30,6 +30,7 @@ class StartCommand extends Command
             ->addArgument('fqcn', InputArgument::REQUIRED, 'The FQCN of the task to execute.')
             ->addOption('unique', 'u', InputOption::VALUE_NONE, 'Ensure the task only execute if not already running.')
             ->addOption('recurring', 'r', InputOption::VALUE_OPTIONAL, 'Define a recurrence pattern.')
+            ->addOption('options', null, InputOption::VALUE_OPTIONAL, 'Accepts a JSON string as an option.', '{}')
             ->setDescription('Start a task.');
     }
 
@@ -38,6 +39,13 @@ class StartCommand extends Command
         $options = [];
         if ($input->getOption('unique')) {
             $options['unique'] = true;
+        }
+        $customOptions = $input->getOption('options');
+        if ($customOptions !== null) {
+            $customOptions = @json_decode($customOptions, true);
+            if (is_array($customOptions)) {
+                $options = array_merge($customOptions, $options);
+            }
         }
         return $this->manager->start($input->getArgument('fqcn'), $options, null, $input->getOption('recurring'));
     }
